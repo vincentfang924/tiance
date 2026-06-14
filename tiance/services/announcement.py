@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from tiance.db.sqlite import connect, rows_to_dicts
+from tiance.errors import AnnouncementNotFound
 
 
 CAPITAL_FLOW_KEYWORDS = ("大宗交易", "龙虎榜", "异动")
@@ -62,6 +63,8 @@ class AnnouncementService:
                 bucket = classify_announcement(title, category_l1_label)
                 publish_at = _coerce_publish_at(row)
                 ann_id = _announcement_id(secucode, row, publish_at)
+                content = row.get("content") or row.get("body") or row.get("text")
+                summary = summarize_announcement(title, bucket, category_l1_label, content)
                 result = conn.execute(
                     """
                     INSERT OR IGNORE INTO announcements(
@@ -77,10 +80,12 @@ class AnnouncementService:
                       source,
                       url,
                       local_path,
+                      content,
+                      summary,
                       raw_payload,
                       created_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         ann_id,
@@ -95,11 +100,24 @@ class AnnouncementService:
                         row.get("source") or "tianyan",
                         row.get("url"),
                         row.get("local_path"),
+                        content,
+                        summary,
                         json.dumps(row, ensure_ascii=False, default=str),
                         now,
                     ),
                 )
                 inserted += result.rowcount
+                if result.rowcount == 0:
+                    conn.execute(
+                        """
+                        UPDATE announcements
+                        SET
+                          content = COALESCE(content, ?),
+                          summary = COALESCE(summary, ?)
+                        WHERE ann_id = ?
+                        """,
+                        (content, summary, ann_id),
+                    )
             conn.commit()
 
         return inserted
@@ -108,6 +126,7 @@ class AnnouncementService:
         self,
         secucode: str,
         bucket: str | None = None,
+        since: date | datetime | str | None = None,
         limit: int = 50,
     ) -> list[dict]:
         safe_limit = max(1, min(limit, 200))
@@ -116,12 +135,50 @@ class AnnouncementService:
         if bucket:
             sql += " AND category_bucket = ?"
             params.append(bucket)
+        if since is not None:
+            sql += " AND publish_at >= ?"
+            params.append(_coerce_date(since).isoformat())
         sql += " ORDER BY publish_at DESC LIMIT ?"
         params.append(safe_limit)
 
         with connect(self.db_path) as conn:
             rows = conn.execute(sql, params).fetchall()
-        return rows_to_dicts(rows)
+        return [_row_with_summary(row) for row in rows_to_dicts(rows)]
+
+    def get_detail(self, secucode: str, ann_id: str) -> dict:
+        with connect(self.db_path) as conn:
+            row = conn.execute(
+                "SELECT * FROM announcements WHERE secucode = ? AND ann_id = ?",
+                (secucode, ann_id),
+            ).fetchone()
+        if row is None:
+            raise AnnouncementNotFound("公告不存在")
+        return _row_with_summary(dict(row))
+
+
+def summarize_announcement(
+    title: str,
+    bucket: str,
+    category_l1_label: str | None = None,
+    content: str | None = None,
+) -> str:
+    title_text = (title or "").strip()
+    category_text = category_l1_label or _bucket_label(bucket)
+    source_text = (content or title_text).strip()
+    if len(source_text) > 80:
+        source_text = source_text[:80].rstrip() + "..."
+    return f"{category_text}：{source_text}"
+
+
+def _row_with_summary(row: dict) -> dict:
+    if not row.get("summary"):
+        row["summary"] = summarize_announcement(
+            row.get("title") or "",
+            row.get("category_bucket") or "other",
+            row.get("category_l1_label"),
+            row.get("content"),
+        )
+    return row
 
 
 def _coerce_date(value: date | datetime | str) -> date:
@@ -149,3 +206,11 @@ def _announcement_id(secucode: str, row: dict, publish_at: str) -> str:
     if row.get("id"):
         return f"{secucode}:{row['id']}"
     return f"{secucode}:{publish_at}:{row.get('title', '')}"
+
+
+def _bucket_label(bucket: str) -> str:
+    return {
+        "business": "经营事项",
+        "capital_flow": "资金异动",
+        "other": "普通公告",
+    }.get(bucket, "公告")

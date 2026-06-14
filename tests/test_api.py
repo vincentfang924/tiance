@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from tiance.db.sqlite import connect
 from tiance.main import create_app
 
 
@@ -23,6 +24,14 @@ def test_post_watchlist_adds_stock_by_name():
 
     assert response.status_code == 200
     assert response.json()["data"]["secucode"] == "600519.SH"
+
+
+def test_post_watchlist_adds_defu_technology_by_name():
+    with TestClient(create_app(testing=True)) as client:
+        response = client.post("/api/watchlist", json={"query": "德福科技"})
+
+    assert response.status_code == 200
+    assert response.json()["data"]["secucode"] == "301511.SZ"
 
 
 def test_post_watchlist_rejects_duplicate_stock():
@@ -101,6 +110,25 @@ def test_get_market_kline_returns_points():
     assert data["points"]
 
 
+def test_get_market_kline_returns_price_and_volume_percent_changes():
+    with TestClient(create_app(testing=True)) as client:
+        response = client.get(
+            "/api/market/600519.SH/kline",
+            params={
+                "start": "2026-06-01",
+                "end": "2026-06-05",
+                "freq": "D",
+            },
+        )
+
+    assert response.status_code == 200
+    points = response.json()["data"]["points"]
+    assert points[0]["pct_change"] is None
+    assert points[0]["volume_change_pct"] is None
+    assert points[1]["pct_change"] is not None
+    assert points[1]["volume_change_pct"] == 1.0
+
+
 def test_get_market_kline_accepts_comma_separated_ma():
     with TestClient(create_app(testing=True)) as client:
         response = client.get(
@@ -172,6 +200,68 @@ def test_get_announcements_returns_fetched_rows():
     data = response.json()["data"]
     assert data
     assert data[0]["secucode"] == "600519.SH"
+    assert data[0]["summary"]
+
+
+def test_get_announcements_generates_summary_for_legacy_rows_without_summary():
+    app = create_app(testing=True)
+    with TestClient(app) as client:
+        client.post("/api/watchlist", json={"query": "600519"})
+        app.state.announcement_service.fetch_for("600519.SH", since="2026-01-01")
+
+        with connect(app.state.settings.db_path) as conn:
+            conn.execute("UPDATE announcements SET summary = NULL WHERE secucode = ?", ("600519.SH",))
+            conn.commit()
+
+        response = client.get("/api/announcements/600519.SH", params={"days": 365})
+
+    assert response.status_code == 200
+    assert response.json()["data"][0]["summary"]
+
+
+def test_get_announcements_filters_by_recent_days():
+    app = create_app(testing=True)
+    with TestClient(app) as client:
+        client.post("/api/watchlist", json={"query": "600519"})
+        app.state.announcement_service.fetch_for("600519.SH", since="2026-01-01")
+
+        recent_response = client.get("/api/announcements/600519.SH", params={"days": 30})
+        year_response = client.get("/api/announcements/600519.SH", params={"days": 365})
+
+    assert recent_response.status_code == 200
+    assert year_response.status_code == 200
+    assert len(recent_response.json()["data"]) == 1
+    assert len(year_response.json()["data"]) == 2
+
+
+def test_get_announcement_detail_returns_summary_and_raw_payload():
+    app = create_app(testing=True)
+    with TestClient(app) as client:
+        client.post("/api/watchlist", json={"query": "600519"})
+        app.state.announcement_service.fetch_for("600519.SH", since="2026-01-01")
+        rows = client.get("/api/announcements/600519.SH", params={"days": 365}).json()["data"]
+
+        response = client.get(f"/api/announcements/600519.SH/{rows[0]['ann_id']}")
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["ann_id"] == rows[0]["ann_id"]
+    assert data["summary"]
+    assert "raw_payload" in data
+
+
+def test_refresh_announcements_for_selected_stock_inserts_rows():
+    with TestClient(create_app(testing=True)) as client:
+        created = client.post("/api/watchlist", json={"query": "德福科技"}).json()["data"]
+
+        refresh_response = client.post(f"/api/announcements/{created['secucode']}/refresh")
+        list_response = client.get(f"/api/announcements/{created['secucode']}")
+
+    assert refresh_response.status_code == 200
+    assert refresh_response.json()["data"]["inserted"] >= 1
+    rows = list_response.json()["data"]
+    assert rows
+    assert rows[0]["secucode"] == "301511.SZ"
 def test_get_admin_db_table_rows_returns_watchlist_rows():
     with TestClient(create_app(testing=True)) as client:
         client.post("/api/watchlist", json={"query": "600519"})
@@ -191,7 +281,7 @@ def test_get_announcements_filters_business_bucket_and_limit():
 
         response = client.get(
             "/api/announcements/600519.SH",
-            params={"bucket": "business", "limit": 1},
+            params={"bucket": "business", "days": 365, "limit": 1},
         )
 
     assert response.status_code == 200
@@ -268,6 +358,9 @@ def test_web_root_serves_browser_workspace():
     assert "天策" in response.text
     assert 'id="watchlist"' in response.text
     assert 'id="chart"' in response.text
+    assert 'id="sync-announcements"' in response.text
+    assert 'id="announcement-range"' in response.text
+    assert 'id="announcement-detail"' in response.text
 
 
 def test_web_assets_are_served():
@@ -279,3 +372,4 @@ def test_web_assets_are_served():
     assert "grid-template-columns" in css_response.text
     assert js_response.status_code == 200
     assert "loadWatchlist" in js_response.text
+    assert "removeStock" in js_response.text

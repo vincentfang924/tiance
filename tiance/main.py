@@ -47,7 +47,7 @@ def create_app(testing: bool = False) -> FastAPI:
         settings.db_path,
         app.state.tianyan_client,
     )
-    app.state.market_service = MarketService(app.state.tianyan_client)
+    app.state.market_service = MarketService(app.state.tianyan_client, db_path=settings.db_path)
     app.state.announcement_service = AnnouncementService(
         settings.db_path,
         app.state.tianyan_client,

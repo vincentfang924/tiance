@@ -17,6 +17,11 @@ class StockNotFound(TianceError):
     code = "STOCK_NOT_FOUND"
 
 
+class AnnouncementNotFound(TianceError):
+    status_code = 404
+    code = "ANNOUNCEMENT_NOT_FOUND"
+
+
 class AlreadyWatching(TianceError):
     status_code = 409
     code = "ALREADY_WATCHING"

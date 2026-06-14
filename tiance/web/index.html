@@ -27,11 +27,14 @@
         <strong id="selected-title">选择一只股票</strong>
         <span id="selected-meta" class="muted"></span>
       </div>
-      <select id="freq" aria-label="K线周期">
-        <option value="D">日线</option>
-        <option value="W">周线</option>
-        <option value="M">月线</option>
-      </select>
+      <div class="toolbar-actions">
+        <button id="sync-announcements" type="button" disabled>同步公告</button>
+        <select id="freq" aria-label="K线周期">
+          <option value="D">日线</option>
+          <option value="W">周线</option>
+          <option value="M">月线</option>
+        </select>
+      </div>
     </section>
     <section id="chart" class="chart" aria-label="K线图"></section>
   </main>
@@ -42,7 +45,14 @@
       <button id="tab-admin" class="tab" type="button">数据源</button>
     </nav>
     <div id="status" class="status"></div>
+    <div id="announcement-range" class="range-tabs" aria-label="公告时间范围">
+      <button class="range-tab active" type="button" data-days="30">近1月</button>
+      <button class="range-tab" type="button" data-days="90">近3月</button>
+      <button class="range-tab" type="button" data-days="180">近6月</button>
+      <button class="range-tab" type="button" data-days="365">近1年</button>
+    </div>
     <div id="info-content" class="info-content"></div>
+    <div id="announcement-detail" class="announcement-detail"></div>
   </aside>
 
   <script src="/app.js"></script>

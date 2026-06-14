@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS announcements (
   source TEXT NOT NULL,
   url TEXT,
   local_path TEXT,
+  content TEXT,
+  summary TEXT,
   raw_payload TEXT,
   is_read INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
@@ -61,6 +63,21 @@ CREATE TABLE IF NOT EXISTS money_flows (
   main_net_inflow_pct REAL,
   raw_payload TEXT,
   UNIQUE(secucode, trade_date)
+);
+
+CREATE TABLE IF NOT EXISTS market_bars (
+  secucode TEXT NOT NULL,
+  trade_date TEXT NOT NULL,
+  open REAL,
+  high REAL,
+  low REAL,
+  close REAL,
+  volume REAL,
+  source TEXT NOT NULL,
+  raw_payload TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY(secucode, trade_date)
 );
 
 CREATE TABLE IF NOT EXISTS rank_list_events (
@@ -85,6 +102,8 @@ CREATE TABLE IF NOT EXISTS task_runs (
 
 CREATE INDEX IF NOT EXISTS idx_announcements_secucode_publish
   ON announcements(secucode, publish_at DESC);
+CREATE INDEX IF NOT EXISTS idx_market_bars_secucode_trade
+  ON market_bars(secucode, trade_date DESC);
 CREATE INDEX IF NOT EXISTS idx_task_runs_task_started
   ON task_runs(task_name, started_at DESC);
 """
@@ -94,4 +113,19 @@ def migrate(db_path: Path) -> None:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with connect(db_path) as conn:
         conn.executescript(SCHEMA)
+        _ensure_columns(
+            conn,
+            "announcements",
+            {
+                "content": "TEXT",
+                "summary": "TEXT",
+            },
+        )
         conn.commit()
+
+
+def _ensure_columns(conn, table_name: str, columns: dict[str, str]) -> None:
+    existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table_name})")}
+    for name, definition in columns.items():
+        if name not in existing:
+            conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {name} {definition}")

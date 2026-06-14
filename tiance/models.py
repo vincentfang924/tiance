@@ -37,6 +37,8 @@ class KlinePoint(BaseModel):
     low: float
     high: float
     volume: float
+    pct_change: float | None = None
+    volume_change_pct: float | None = None
     ma: dict[str, float | None] = Field(default_factory=dict)
     macd: dict[str, float | None] = Field(default_factory=dict)
 

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import os
 from pathlib import Path
 
 
@@ -14,9 +15,10 @@ def default_settings(testing: bool = False) -> Settings:
     root = Path(__file__).resolve().parents[1]
     data_dir = root / ("work" if testing else "data")
     data_dir.mkdir(parents=True, exist_ok=True)
+    use_mock_tianyan = testing or os.environ.get("TIANCE_USE_MOCK_TIANYAN") == "1"
     return Settings(
         root_dir=root,
         data_dir=data_dir,
         db_path=data_dir / ("tiance_test.db" if testing else "tiance.db"),
-        use_mock_tianyan=True,
+        use_mock_tianyan=use_mock_tianyan,
     )

@@ -10,25 +10,33 @@ class Security:
 
 class MockTianyanClient:
     def __init__(self) -> None:
+        recent = date.today() - timedelta(days=2)
         self._securities = [
-            Security(secucode="600519.SH", secuname="贵州茅台"),
-            Security(secucode="300750.SZ", secuname="宁德时代"),
-            Security(secucode="000001.SZ", secuname="平安银行"),
+            Security(secucode="600519.SH", secuname="\u8d35\u5dde\u8305\u53f0"),
+            Security(secucode="300750.SZ", secuname="\u5b81\u5fb7\u65f6\u4ee3"),
+            Security(secucode="000001.SZ", secuname="\u5e73\u5b89\u94f6\u884c"),
+            Security(secucode="301511.SZ", secuname="\u5fb7\u798f\u79d1\u6280"),
         ]
         self._announcements = {
             "600519.SH": [
                 {
                     "secucode": "600519.SH",
+                    "publish_date": recent,
+                    "title": "\u8d35\u5dde\u8305\u53f0\u5173\u4e8e\u8058\u4efb\u8463\u4e8b\u4f1a\u79d8\u4e66\u7684\u516c\u544a",
+                    "url": "mock://announcements/600519/recent",
+                },
+                {
+                    "secucode": "600519.SH",
                     "publish_date": date(2026, 3, 18),
-                    "title": "贵州茅台关于签订重大合同的公告",
+                    "title": "\u8d35\u5dde\u8305\u53f0\u5173\u4e8e\u7b7e\u8ba2\u91cd\u5927\u5408\u540c\u7684\u516c\u544a",
                     "url": "mock://announcements/600519/2026-03-18",
-                }
+                },
             ],
             "300750.SZ": [
                 {
                     "secucode": "300750.SZ",
                     "publish_date": date(2026, 2, 10),
-                    "title": "宁德时代关于战略合作协议签订的公告",
+                    "title": "\u5b81\u5fb7\u65f6\u4ee3\u5173\u4e8e\u6218\u7565\u5408\u4f5c\u534f\u8bae\u7b7e\u8ba2\u7684\u516c\u544a",
                     "url": "mock://announcements/300750/2026-02-10",
                 }
             ],
@@ -36,8 +44,16 @@ class MockTianyanClient:
                 {
                     "secucode": "000001.SZ",
                     "publish_date": date(2026, 1, 15),
-                    "title": "平安银行业务进展公告",
+                    "title": "\u5e73\u5b89\u94f6\u884c\u4e1a\u52a1\u8fdb\u5c55\u516c\u544a",
                     "url": "mock://announcements/000001/2026-01-15",
+                }
+            ],
+            "301511.SZ": [
+                {
+                    "secucode": "301511.SZ",
+                    "publish_date": recent,
+                    "title": "\u5fb7\u798f\u79d1\u6280\u5173\u4e8e\u54112026\u5e74\u9650\u5236\u6027\u80a1\u7968\u6fc0\u52b1\u8ba1\u5212\u6fc0\u52b1\u5bf9\u8c61\u6388\u4e88\u9650\u5236\u6027\u80a1\u7968\u7684\u516c\u544a",
+                    "url": "mock://announcements/301511/recent",
                 }
             ],
         }

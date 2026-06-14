@@ -98,15 +98,53 @@ button {
   min-height: 54px;
   height: auto;
   display: grid;
-  gap: 4px;
+  grid-template-columns: 1fr 30px;
+  align-items: center;
+  gap: 8px;
   text-align: left;
   background: var(--panel-strong);
   border-color: var(--line);
+  padding: 8px 10px;
 }
 
 .stock-row.active {
   background: var(--primary-soft);
   border-color: #7ab7e0;
+}
+
+.stock-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.stock-main strong,
+.stock-code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stock-remove {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.stock-remove:hover {
+  border-color: #efc3bd;
+  background: #fff4f2;
+  color: var(--danger);
 }
 
 .stock-code,
@@ -128,6 +166,17 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .chart {
@@ -154,9 +203,30 @@ button {
   font-size: 12px;
 }
 
+.range-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.range-tab {
+  height: 30px;
+  padding: 0 6px;
+  background: var(--panel-strong);
+  font-size: 12px;
+}
+
+.range-tab.active {
+  background: var(--primary-soft);
+  border-color: #7ab7e0;
+  color: var(--primary);
+}
+
 .item {
   border-bottom: 1px solid #edf1f5;
   padding: 10px 0;
+  cursor: pointer;
 }
 
 .item strong {
@@ -173,6 +243,43 @@ button {
   background: #e8f4ee;
   color: var(--accent);
   font-size: 12px;
+}
+
+.summary {
+  margin-top: 6px;
+  color: #3e4c59;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.announcement-detail {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.detail-card {
+  display: grid;
+  gap: 8px;
+}
+
+.detail-card h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.detail-body {
+  color: #2f3b46;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.detail-link {
+  color: var(--primary);
+  font-size: 12px;
+  text-decoration: none;
 }
 
 .empty {

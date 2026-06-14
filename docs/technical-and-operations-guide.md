@@ -1,6 +1,6 @@
 # 天策技术文档与操作指南
 
-本文档面向后续开发、部署、排障和日常使用。当前版本对应 Phase 0：先用 mock 天眼数据跑通本地端到端闭环，真实天眼 SQL/接口映射留到下一阶段接入。
+本文档面向后续开发、部署、排障和日常使用。当前版本对应 Phase 0 增强版：非测试模式默认通过天研拉取真实 A 股行情与公告，测试模式或显式配置可使用 mock 数据。
 
 ## 1. 系统概览
 
@@ -19,7 +19,8 @@
 
 - 本地服务启动后监听 `127.0.0.1:8000`。
 - API 与静态前端由同一个 FastAPI 应用提供。
-- 默认使用 `MockTianyanClient`，不依赖真实天眼连接即可运行。
+- 非测试模式默认使用 `TianyanClient` 调用 `opencli tianyan sql`；测试模式默认使用 `MockTianyanClient`。
+- 设置 `TIANCE_USE_MOCK_TIANYAN=1` 可在非测试模式强制使用 mock 数据。
 - 非测试模式数据写入 `data/tiance.db`；测试模式数据写入 `work/tiance_test.db`。
 
 ```mermaid
@@ -29,7 +30,7 @@ flowchart LR
   FastAPI --> Market["MarketService"]
   FastAPI --> Announcement["AnnouncementService"]
   FastAPI --> Admin["AdminService"]
-  Market --> Tianyan["MockTianyanClient"]
+  Market --> Tianyan["TianyanClient / MockTianyanClient"]
   Watchlist --> Tianyan
   Announcement --> Tianyan
   Watchlist --> SQLite["SQLite"]
@@ -80,7 +81,7 @@ work/                  测试数据库、日志、临时文件，已被 .gitigno
 - `root_dir`：项目根目录。
 - `data_dir`：运行数据目录，测试模式为 `work/`，非测试模式为 `data/`。
 - `db_path`：SQLite 文件路径。
-- `use_mock_tianyan`：当前固定为 `True`。
+- `use_mock_tianyan`：测试模式默认为 `True`；非测试模式默认为 `False`，可由 `TIANCE_USE_MOCK_TIANYAN` 覆盖。
 
 ### 3.3 数据库
 
@@ -89,7 +90,8 @@ work/                  测试数据库、日志、临时文件，已被 .gitigno
 - `groups`：自选分组。
 - `watchlist`：自选股。
 - `concepts` / `stock_concepts`：概念标签预留。
-- `announcements`：公告。
+- `announcements`：公告、摘要与可用正文。
+- `market_bars`：K 线本地备份。
 - `money_flows`：主力资金流预留。
 - `rank_list_events`：龙虎榜事件预留。
 - `task_runs`：调度任务运行记录。
@@ -97,13 +99,14 @@ work/                  测试数据库、日志、临时文件，已被 .gitigno
 重要索引：
 
 - `idx_announcements_secucode_publish`
+- `idx_market_bars_secucode_trade`
 - `idx_task_runs_task_started`
 
 ### 3.4 服务层
 
 - `WatchlistService`：添加、查询、删除自选股。
-- `MarketService`：从日线 mock 数据生成日/周/月 K 线，附带 MA 与 MACD。
-- `AnnouncementService`：拉取自选股公告、分类、去重、列表查询。
+- `MarketService`：从天研日线生成日/周/月 K 线，附带 MA、MACD、价格涨跌幅、成交量环比，并把日线备份到 `market_bars`。
+- `AnnouncementService`：拉取自选股公告、分类、去重、列表查询、详情查询和本地摘要生成。
 - `AdminService`：数据源状态、SQLite 表浏览、手动刷新、同名任务保护。
 
 ### 3.5 调度
@@ -164,6 +167,11 @@ work/                  测试数据库、日志、临时文件，已被 .gitigno
 - `freq`：`D`、`W`、`M`，默认 `D`。
 - `ma`：均线周期，可重复传，也可逗号分隔，例如 `ma=5,10,20`。
 
+返回点位包含：
+
+- `pct_change`：相对上一根 K 线收盘价的涨跌幅百分比。
+- `volume_change_pct`：相对上一根 K 线成交量的变化百分比。
+
 示例：
 
 ```powershell
@@ -174,11 +182,14 @@ Invoke-RestMethod "http://127.0.0.1:8000/api/market/600519.SH/kline?start=2026-0
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/api/announcements/{secucode}` | 查询公告 |
+| GET | `/api/announcements/{secucode}` | 查询公告，默认近 30 天 |
+| GET | `/api/announcements/{secucode}/{ann_id}` | 查询公告详情 |
+| POST | `/api/announcements/{secucode}/refresh` | 手动同步单只股票公告 |
 
 参数：
 
 - `bucket`：可选，按分类过滤，例如 `business`、`capital_flow`、`other`。
+- `days`：查询时间范围，默认 `30`，最大 `365`。
 - `limit`：默认 `50`，范围 `1..200`。
 
 ### 4.5 管理端
@@ -207,9 +218,9 @@ Invoke-RestMethod "http://127.0.0.1:8000/api/market/600519.SH/kline?start=2026-0
 
 页面布局：
 
-- 左侧：品牌、添加股票、自选列表。
-- 中间：K 线图与周期切换。
-- 右侧：公告与数据源状态切换。
+- 左侧：品牌、添加股票、自选列表和删除按钮。
+- 中间：K 线图、成交量图与周期切换。
+- 右侧：公告时间标签、摘要、详情与数据源状态切换。
 
 操作入口：
 
@@ -217,7 +228,8 @@ Invoke-RestMethod "http://127.0.0.1:8000/api/market/600519.SH/kline?start=2026-0
 2. 输入 `600519` 或 `贵州茅台`。
 3. 点击股票行。
 4. 中间显示 K 线图，右侧显示公告。
-5. 点击“数据源”查看管理端数据源状态。
+5. 点击公告可查看摘要、可用正文和原始链接。
+6. 点击“同步公告”可同步当前股票公告；点击“数据源”查看管理端数据源状态。
 
 前端使用 ECharts CDN。如果机器无法访问 CDN，页面主体可打开，但 K 线图不会渲染；后续可改为本地 vendored ECharts。
 
