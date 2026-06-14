@@ -19,6 +19,7 @@ def get_kline(
     start: date | None = None,
     end: date | None = None,
     freq: str = "D",
+    adjust: str = "none",
     ma: str = Query(default="5,10,20,60"),
 ):
     result = _service(request).get_kline(
@@ -27,6 +28,7 @@ def get_kline(
         end=end,
         freq=freq,
         ma=_parse_ma(ma),
+        adjust=adjust,
     )
     return data_response(result.model_dump(mode="json"))
 

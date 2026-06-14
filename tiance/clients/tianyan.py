@@ -48,7 +48,9 @@ class TianyanClient:
               S_DQ_HIGH,
               S_DQ_LOW,
               S_DQ_CLOSE,
-              S_DQ_VOLUME
+              S_DQ_VOLUME,
+              S_DQ_ADJCLOSE_BACKWARD,
+              S_DQ_ADJFACTOR
             FROM wind_admin.ASHAREEODPRICES
             WHERE S_INFO_WINDCODE = '{_sql_literal(wind_code)}'
               AND TRADE_DT >= '{start_text}'
@@ -65,6 +67,8 @@ class TianyanClient:
                 "low": _number(_get(row, "S_DQ_LOW")),
                 "close": _number(_get(row, "S_DQ_CLOSE")),
                 "volume": _number(_get(row, "S_DQ_VOLUME")),
+                "adj_close_backward": _number(_get_optional(row, "S_DQ_ADJCLOSE_BACKWARD")),
+                "adj_factor": _number(_get_optional(row, "S_DQ_ADJFACTOR")),
             }
             for row in rows
         ]

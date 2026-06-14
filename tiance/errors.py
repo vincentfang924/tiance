@@ -42,6 +42,11 @@ class InvalidFreq(TianceError):
     code = "INVALID_FREQ"
 
 
+class InvalidAdjustMode(TianceError):
+    status_code = 400
+    code = "INVALID_ADJUST_MODE"
+
+
 def data_response(data):
     return {"data": data}
 

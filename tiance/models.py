@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 SecuCode = str
 Freq = Literal["D", "W", "M"]
+AdjustMode = Literal["none", "forward"]
 
 
 class AddStockRequest(BaseModel):
@@ -39,6 +40,7 @@ class KlinePoint(BaseModel):
     volume: float
     pct_change: float | None = None
     volume_change_pct: float | None = None
+    adjust_ratio: float | None = None
     ma: dict[str, float | None] = Field(default_factory=dict)
     macd: dict[str, float | None] = Field(default_factory=dict)
 
@@ -46,4 +48,5 @@ class KlinePoint(BaseModel):
 class KlineData(BaseModel):
     secucode: str
     freq: Freq
+    adjust: AdjustMode = "none"
     points: list[KlinePoint]

@@ -55,18 +55,19 @@ def resample_ohlcv(df: pd.DataFrame, freq: str) -> pd.DataFrame:
     rule = {"W": "W-FRI", "M": "ME"}[freq]
     source = df.copy()
     source["date"] = pd.to_datetime(source["date"])
+    aggregations = {
+        "open": "first",
+        "high": "max",
+        "low": "min",
+        "close": "last",
+        "volume": "sum",
+    }
+    if "adjust_ratio" in source.columns:
+        aggregations["adjust_ratio"] = "last"
     aggregated = (
         source.set_index("date")
         .resample(rule)
-        .agg(
-            {
-                "open": "first",
-                "high": "max",
-                "low": "min",
-                "close": "last",
-                "volume": "sum",
-            }
-        )
+        .agg(aggregations)
         .dropna(subset=["open", "high", "low", "close"])
         .reset_index()
     )

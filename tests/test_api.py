@@ -129,6 +129,24 @@ def test_get_market_kline_returns_price_and_volume_percent_changes():
     assert points[1]["volume_change_pct"] == 1.0
 
 
+def test_get_market_kline_accepts_forward_adjustment():
+    with TestClient(create_app(testing=True)) as client:
+        response = client.get(
+            "/api/market/600519.SH/kline",
+            params={
+                "start": "2026-06-01",
+                "end": "2026-06-05",
+                "freq": "D",
+                "adjust": "forward",
+            },
+        )
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["adjust"] == "forward"
+    assert data["points"][0]["adjust_ratio"] == 1
+
+
 def test_get_market_kline_accepts_comma_separated_ma():
     with TestClient(create_app(testing=True)) as client:
         response = client.get(
@@ -160,6 +178,21 @@ def test_get_market_kline_rejects_invalid_freq():
 
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "INVALID_FREQ"
+
+
+def test_get_market_kline_rejects_invalid_adjust_mode():
+    with TestClient(create_app(testing=True)) as client:
+        response = client.get(
+            "/api/market/600519.SH/kline",
+            params={
+                "start": "2026-06-01",
+                "end": "2026-06-08",
+                "adjust": "backward",
+            },
+        )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "INVALID_ADJUST_MODE"
 
 
 def test_blank_watchlist_query_returns_wrapped_validation_error():
@@ -358,6 +391,7 @@ def test_web_root_serves_browser_workspace():
     assert "天策" in response.text
     assert 'id="watchlist"' in response.text
     assert 'id="chart"' in response.text
+    assert 'id="adjust-forward"' in response.text
     assert 'id="sync-announcements"' in response.text
     assert 'id="announcement-range"' in response.text
     assert 'id="announcement-detail"' in response.text
@@ -373,3 +407,5 @@ def test_web_assets_are_served():
     assert js_response.status_code == 200
     assert "loadWatchlist" in js_response.text
     assert "removeStock" in js_response.text
+    assert "axisPointer" in js_response.text
+    assert "link" in js_response.text

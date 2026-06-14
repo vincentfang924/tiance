@@ -11,6 +11,32 @@ from tiance.services.indicators import _nullable_float, add_macd, add_ma, resamp
 from tiance.services.market import MarketService
 
 
+class AdjustedKlineClient:
+    def get_daily_kline(self, secucode: str, start: date, end: date) -> list[dict]:
+        return [
+            {
+                "date": date(2026, 6, 10),
+                "open": 770,
+                "high": 799.75,
+                "low": 760.1,
+                "close": 772.5,
+                "volume": 1000,
+                "adj_close_backward": 551.07,
+                "adj_factor": 11.944824,
+            },
+            {
+                "date": date(2026, 6, 11),
+                "open": 552,
+                "high": 575,
+                "low": 498.67,
+                "close": 526,
+                "volume": 1400,
+                "adj_close_backward": 526,
+                "adj_factor": 16.744473,
+            },
+        ]
+
+
 def test_add_ma_adds_expected_column():
     df = pd.DataFrame({"close": [1, 2, 3, 4, 5]})
     result = add_ma(df, [3])
@@ -83,6 +109,29 @@ def test_market_service_get_kline_adds_price_and_volume_percent_changes():
     assert result.points[0].volume_change_pct is None
     assert result.points[1].pct_change is not None
     assert result.points[1].volume_change_pct == 1.0
+
+
+def test_market_service_get_kline_can_apply_forward_adjustment():
+    service = MarketService(AdjustedKlineClient())
+
+    result = service.get_kline(
+        "300502.SZ",
+        start=date(2026, 6, 10),
+        end=date(2026, 6, 11),
+        freq="D",
+        ma=[],
+        adjust="forward",
+    )
+
+    first = result.points[0]
+    ratio = 551.07 / 772.5
+    assert result.adjust == "forward"
+    assert first.adjust_ratio == pytest.approx(ratio)
+    assert first.open == pytest.approx(770 * ratio)
+    assert first.high == pytest.approx(799.75 * ratio)
+    assert first.low == pytest.approx(760.1 * ratio)
+    assert first.close == pytest.approx(551.07)
+    assert result.points[1].close == 526
 
 
 def test_market_service_backs_up_daily_kline_rows_to_sqlite(tmp_path):

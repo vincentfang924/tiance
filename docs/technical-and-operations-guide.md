@@ -105,7 +105,7 @@ work/                  测试数据库、日志、临时文件，已被 .gitigno
 ### 3.4 服务层
 
 - `WatchlistService`：添加、查询、删除自选股。
-- `MarketService`：从天研日线生成日/周/月 K 线，附带 MA、MACD、价格涨跌幅、成交量环比，并把日线备份到 `market_bars`。
+- `MarketService`：从天研日线生成日/周/月 K 线，支持未复权与前复权，附带 MA、MACD、价格涨跌幅、成交量环比，并把日线备份到 `market_bars`。
 - `AnnouncementService`：拉取自选股公告、分类、去重、列表查询、详情查询和本地摘要生成。
 - `AdminService`：数据源状态、SQLite 表浏览、手动刷新、同名任务保护。
 
@@ -165,17 +165,26 @@ work/                  测试数据库、日志、临时文件，已被 .gitigno
 - `start`：开始日期，格式 `YYYY-MM-DD`，可选。
 - `end`：结束日期，格式 `YYYY-MM-DD`，可选。
 - `freq`：`D`、`W`、`M`，默认 `D`。
+- `adjust`：复权模式，`none` 为未复权，`forward` 为前复权，默认 `none`。
 - `ma`：均线周期，可重复传，也可逗号分隔，例如 `ma=5,10,20`。
 
 返回点位包含：
 
 - `pct_change`：相对上一根 K 线收盘价的涨跌幅百分比。
 - `volume_change_pct`：相对上一根 K 线成交量的变化百分比。
+- `adjust_ratio`：当前点位使用的价格复权比例，未复权为 `1`。
+
+前复权使用 `wind_admin.ASHAREEODPRICES.S_DQ_ADJCLOSE_BACKWARD` 反推当日 OHLC 复权比例：
+
+```text
+adjust_ratio = S_DQ_ADJCLOSE_BACKWARD / S_DQ_CLOSE
+```
 
 示例：
 
 ```powershell
 Invoke-RestMethod "http://127.0.0.1:8000/api/market/600519.SH/kline?start=2026-01-01&end=2026-06-14&freq=D&ma=5,10,20"
+Invoke-RestMethod "http://127.0.0.1:8000/api/market/300502.SZ/kline?start=2026-06-09&end=2026-06-12&freq=D&adjust=forward&ma=5"
 ```
 
 ### 4.4 公告
@@ -219,7 +228,7 @@ Invoke-RestMethod "http://127.0.0.1:8000/api/market/600519.SH/kline?start=2026-0
 页面布局：
 
 - 左侧：品牌、添加股票、自选列表和删除按钮。
-- 中间：K 线图、成交量图与周期切换。
+- 中间：K 线图、成交量图、前复权切换与周期切换。
 - 右侧：公告时间标签、摘要、详情与数据源状态切换。
 
 操作入口：
@@ -227,7 +236,7 @@ Invoke-RestMethod "http://127.0.0.1:8000/api/market/600519.SH/kline?start=2026-0
 1. 启动后打开 `http://127.0.0.1:8000`。
 2. 输入 `600519` 或 `贵州茅台`。
 3. 点击股票行。
-4. 中间显示 K 线图，右侧显示公告。
+4. 中间显示 K 线图，右侧显示公告；点击“前复权”可切换复权绘图。
 5. 点击公告可查看摘要、可用正文和原始链接。
 6. 点击“同步公告”可同步当前股票公告；点击“数据源”查看管理端数据源状态。
 

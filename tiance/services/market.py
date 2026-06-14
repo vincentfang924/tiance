@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from tiance.db.sqlite import connect
-from tiance.errors import InvalidFreq
+from tiance.errors import InvalidAdjustMode, InvalidFreq
 from tiance.models import KlineData, KlinePoint
 from tiance.services.indicators import _nullable_float, add_ma, add_macd, resample_ohlcv
 
@@ -22,18 +22,22 @@ class MarketService:
         end: date | None = None,
         freq: str = "D",
         ma: list[int] | None = None,
+        adjust: str = "none",
     ) -> KlineData:
         if freq not in {"D", "W", "M"}:
             raise InvalidFreq(f"不支持的K线频率：{freq}")
+        if adjust not in {"none", "forward"}:
+            raise InvalidAdjustMode(f"不支持的复权模式：{adjust}")
 
         end_date = end or date.today()
         start_date = start or end_date - timedelta(days=365)
         rows = self.tianyan_client.get_daily_kline(secucode, start_date, end_date)
         if not rows:
-            return KlineData(secucode=secucode, freq=freq, points=[])
+            return KlineData(secucode=secucode, freq=freq, adjust=adjust, points=[])
         self._backup_daily_rows(secucode, rows)
 
         frame = pd.DataFrame(rows)
+        frame = apply_price_adjustment(frame, adjust)
         frame = resample_ohlcv(frame, freq)
         if ma:
             frame = add_ma(frame, ma)
@@ -42,7 +46,7 @@ class MarketService:
         frame["volume_change_pct"] = frame["volume"].pct_change() * 100
 
         points = [self._point_from_row(row, ma or []) for _, row in frame.iterrows()]
-        return KlineData(secucode=secucode, freq=freq, points=points)
+        return KlineData(secucode=secucode, freq=freq, adjust=adjust, points=points)
 
     def _point_from_row(self, row, ma_periods: list[int]) -> KlinePoint:
         point_date = row["date"]
@@ -58,6 +62,7 @@ class MarketService:
             volume=_nullable_float(row["volume"]),
             pct_change=_nullable_float(row["pct_change"]),
             volume_change_pct=_nullable_float(row["volume_change_pct"]),
+            adjust_ratio=_nullable_float(row.get("adjust_ratio")),
             ma={f"ma{period}": _nullable_float(row[f"ma{period}"]) for period in ma_periods},
             macd={
                 "dif": _nullable_float(row["dif"]),
@@ -122,3 +127,20 @@ def _date_text(value) -> str:
     if isinstance(value, date):
         return value.isoformat()
     return str(value)
+
+
+def apply_price_adjustment(frame: pd.DataFrame, adjust: str) -> pd.DataFrame:
+    frame = frame.copy()
+    frame["adjust_ratio"] = 1.0
+    if adjust != "forward":
+        return frame
+
+    close = pd.to_numeric(frame["close"], errors="coerce")
+    adjusted_close = pd.to_numeric(frame.get("adj_close_backward"), errors="coerce")
+    ratio = adjusted_close / close
+    ratio = ratio.where(close.notna() & (close != 0) & adjusted_close.notna(), 1.0)
+    frame["adjust_ratio"] = ratio
+    for column in ["open", "high", "low", "close"]:
+        frame[column] = pd.to_numeric(frame[column], errors="coerce") * ratio
+    frame["close"] = adjusted_close.where(adjusted_close.notna(), frame["close"])
+    return frame

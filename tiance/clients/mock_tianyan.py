@@ -91,6 +91,8 @@ class MockTianyanClient:
                         "low": round(open_price - 1.2, 2),
                         "high": round(close_price + 1.4, 2),
                         "volume": 1_000_000 + offset * 10_000,
+                        "adj_close_backward": close_price,
+                        "adj_factor": 1,
                     }
                 )
             current += timedelta(days=1)

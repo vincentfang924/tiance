@@ -2,6 +2,7 @@ let selectedCode = null;
 let selectedRow = null;
 let activePanel = "announcements";
 let announcementDays = 30;
+let adjustMode = "none";
 
 const chartElement = document.getElementById("chart");
 const chart = echarts.init(chartElement);
@@ -98,6 +99,7 @@ async function removeStock(secucode) {
     document.getElementById("selected-title").textContent = "选择一只股票";
     document.getElementById("selected-meta").textContent = "";
     document.getElementById("sync-announcements").disabled = true;
+    document.getElementById("adjust-forward").disabled = true;
     document.getElementById("info-content").innerHTML = '<div class="empty">选择股票后显示公告。</div>';
     document.getElementById("announcement-detail").innerHTML = "";
   }
@@ -108,11 +110,19 @@ async function selectStock(row) {
   selectedCode = row.secucode;
   selectedRow = row;
   document.getElementById("selected-title").textContent = `${row.secuname} ${row.secucode}`;
-  document.getElementById("selected-meta").textContent = row.unread_count ? `未读公告 ${row.unread_count}` : "";
+  updateSelectedMeta(row);
   document.getElementById("sync-announcements").disabled = false;
+  document.getElementById("adjust-forward").disabled = false;
   await loadWatchlist();
   await loadKline();
   await loadActivePanel();
+}
+
+function updateSelectedMeta(row = selectedRow) {
+  const parts = [];
+  if (row?.unread_count) parts.push(`未读公告 ${row.unread_count}`);
+  if (adjustMode === "forward") parts.push("前复权");
+  document.getElementById("selected-meta").textContent = parts.join(" · ");
 }
 
 function dateNDaysAgo(days) {
@@ -128,6 +138,7 @@ async function loadKline() {
     start: dateNDaysAgo(180),
     end: new Date().toISOString().slice(0, 10),
     freq,
+    adjust: adjustMode,
     ma: "5,10,20",
   });
   const data = await api(`/api/market/${selectedCode}/kline?${params.toString()}`);
@@ -140,9 +151,17 @@ async function loadKline() {
 
   chart.setOption({
     animation: false,
+    axisPointer: {
+      link: [{ xAxisIndex: [0, 1] }],
+      lineStyle: { type: "dashed", color: "#7b8794" },
+    },
     tooltip: {
       trigger: "axis",
-      axisPointer: { type: "cross" },
+      axisPointer: {
+        type: "cross",
+        crossStyle: { type: "dashed", color: "#7b8794" },
+        lineStyle: { type: "dashed", color: "#7b8794" },
+      },
       formatter(items) {
         const index = items[0]?.dataIndex ?? 0;
         const point = data.points[index];
@@ -151,6 +170,7 @@ async function loadKline() {
           `<strong>${point.date}</strong>`,
           `开 ${formatNumber(point.open)} 高 ${formatNumber(point.high)}`,
           `低 ${formatNumber(point.low)} 收 ${formatNumber(point.close)}`,
+          `模式 ${data.adjust === "forward" ? "前复权" : "未复权"}`,
           `涨跌幅 ${formatPct(point.pct_change)}`,
           `成交量 ${formatNumber(point.volume)}`,
           `量比前日 ${formatPct(point.volume_change_pct)}`,
@@ -162,8 +182,21 @@ async function loadKline() {
       { left: 54, right: 20, top: "73%", height: "15%" },
     ],
     xAxis: [
-      { type: "category", data: dates, boundaryGap: true, axisLine: { lineStyle: { color: "#d9e0e8" } } },
-      { type: "category", gridIndex: 1, data: dates, boundaryGap: true, axisLabel: { show: false } },
+      {
+        type: "category",
+        data: dates,
+        boundaryGap: true,
+        axisLine: { lineStyle: { color: "#d9e0e8" } },
+        axisPointer: { show: true, type: "line", lineStyle: { type: "dashed", color: "#7b8794" } },
+      },
+      {
+        type: "category",
+        gridIndex: 1,
+        data: dates,
+        boundaryGap: true,
+        axisLabel: { show: false },
+        axisPointer: { show: true, type: "line", lineStyle: { type: "dashed", color: "#7b8794" } },
+      },
     ],
     yAxis: [
       { scale: true, splitLine: { lineStyle: { color: "#edf1f5" } } },
@@ -305,6 +338,13 @@ document.getElementById("add-form").addEventListener("submit", async (event) => 
 
 document.getElementById("freq").addEventListener("change", () => withStatus(loadKline));
 document.getElementById("sync-announcements").addEventListener("click", syncAnnouncements);
+document.getElementById("adjust-forward").addEventListener("click", () => {
+  adjustMode = adjustMode === "forward" ? "none" : "forward";
+  const button = document.getElementById("adjust-forward");
+  button.setAttribute("aria-pressed", String(adjustMode === "forward"));
+  updateSelectedMeta();
+  withStatus(loadKline);
+});
 document.getElementById("tab-announcements").addEventListener("click", () => setPanel("announcements"));
 document.getElementById("tab-admin").addEventListener("click", () => setPanel("admin"));
 document.querySelectorAll(".range-tab").forEach((button) => {
