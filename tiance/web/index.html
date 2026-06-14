@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>天策</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <header class="brand">
+      <h1>天策</h1>
+      <form id="add-form" class="add-form">
+        <input id="stock-query" type="search" placeholder="代码或名称" autocomplete="off" aria-label="代码或名称">
+        <button type="submit">添加</button>
+      </form>
+    </header>
+    <div class="sidebar-title">自选</div>
+    <div id="watchlist" class="watchlist"></div>
+  </aside>
+
+  <main class="workspace">
+    <section class="chart-toolbar">
+      <div>
+        <strong id="selected-title">选择一只股票</strong>
+        <span id="selected-meta" class="muted"></span>
+      </div>
+      <select id="freq" aria-label="K线周期">
+        <option value="D">日线</option>
+        <option value="W">周线</option>
+        <option value="M">月线</option>
+      </select>
+    </section>
+    <section id="chart" class="chart" aria-label="K线图"></section>
+  </main>
+
+  <aside class="info-panel">
+    <nav class="tabs" aria-label="信息面板">
+      <button id="tab-announcements" class="tab active" type="button">公告</button>
+      <button id="tab-admin" class="tab" type="button">数据源</button>
+    </nav>
+    <div id="status" class="status"></div>
+    <div id="info-content" class="info-content"></div>
+  </aside>
+
+  <script src="/app.js"></script>
+</body>
+</html>
