@@ -115,6 +115,100 @@ class TianyanClient:
             for row in rows
         ]
 
+    def get_stock_concepts(self, secucode: str) -> list[dict]:
+        meta = self._find_security(secucode)
+        if meta is None:
+            return []
+        today_text = date.today().isoformat()
+        rows = self._sql(
+            f"""
+            SELECT
+              c.CONCEPTCODE,
+              l.CONCEPTNAME,
+              l.CLASSNAME,
+              l.SUBCLASSNAME
+            FROM jydb.lc_coconcept c
+            JOIN jydb.lc_conceptlist l ON l.CONCEPTCODE = c.CONCEPTCODE
+            WHERE c.INNERCODE = {meta.innercode}
+              AND (c.OUTDATE IS NULL OR c.OUTDATE > '{today_text}')
+              AND l.CONCEPTSTATE = 1
+            ORDER BY l.CLASSNAME, l.SUBCLASSNAME, l.CONCEPTNAME
+            LIMIT 80
+            """
+        )
+        return [
+            {
+                "concept_code": int(_get(row, "CONCEPTCODE")),
+                "concept_name": str(_get(row, "CONCEPTNAME") or ""),
+                "class_name": str(_get_optional(row, "CLASSNAME") or ""),
+                "subclass_name": str(_get_optional(row, "SUBCLASSNAME") or ""),
+            }
+            for row in rows
+        ]
+
+    def get_concept_moneyflow(self, concept_codes: list[int]) -> dict:
+        codes = [int(code) for code in concept_codes[:16]]
+        if not codes:
+            return {"latest_trade_date": None, "items": []}
+
+        trade_dates = [
+            str(_get(row, "TRADE_DT"))
+            for row in self._sql(
+                f"""
+                SELECT DISTINCT TRADE_DT
+                FROM wind_admin.ASHAREMONEYFLOW
+                WHERE TRADE_DT <= '{date.today().strftime("%Y%m%d")}'
+                ORDER BY TRADE_DT DESC
+                LIMIT 20
+                """
+            )
+        ]
+        if not trade_dates:
+            return {"latest_trade_date": None, "items": []}
+
+        dt1 = trade_dates[0]
+        dt5 = trade_dates[min(4, len(trade_dates) - 1)]
+        dt20 = trade_dates[-1]
+        today_text = date.today().isoformat()
+        items = []
+        for code in codes:
+            try:
+                rows = self._sql(
+                    f"""
+                    SELECT
+                      SUM(CASE WHEN mf.TRADE_DT = '{dt1}' THEN mf.S_MFD_INFLOW ELSE 0 END) AS FLOW_1D,
+                      SUM(CASE WHEN mf.TRADE_DT >= '{dt5}' THEN mf.S_MFD_INFLOW ELSE 0 END) AS FLOW_5D,
+                      SUM(mf.S_MFD_INFLOW) AS FLOW_20D,
+                      COUNT(DISTINCT mf.S_INFO_WINDCODE) AS STOCK_COUNT,
+                      MAX(mf.TRADE_DT) AS LATEST_DT
+                    FROM wind_admin.ASHAREMONEYFLOW mf
+                    WHERE mf.TRADE_DT >= '{dt20}'
+                      AND mf.S_INFO_WINDCODE IN (
+                        SELECT CONCAT(sm.SECUCODE, CASE WHEN LEFT(sm.SECUCODE, 1) = '6' THEN '.SH' ELSE '.SZ' END)
+                        FROM jydb.lc_coconcept cc
+                        JOIN jydb.secumain sm ON sm.INNERCODE = cc.INNERCODE AND sm.SECUCATEGORY = 1
+                        WHERE cc.CONCEPTCODE = {code}
+                          AND (cc.OUTDATE IS NULL OR cc.OUTDATE > '{today_text}')
+                      )
+                    """
+                )
+            except TianyanUnavailable:
+                continue
+            if not rows:
+                continue
+            row = rows[0]
+            items.append(
+                {
+                    "concept_code": code,
+                    "flow_1d": _number(_get_optional(row, "FLOW_1D")) or 0,
+                    "flow_5d": _number(_get_optional(row, "FLOW_5D")) or 0,
+                    "flow_20d": _number(_get_optional(row, "FLOW_20D")) or 0,
+                    "stock_count": int(_number(_get_optional(row, "STOCK_COUNT")) or 0),
+                    "latest_trade_date": _get_optional(row, "LATEST_DT"),
+                }
+            )
+        return {"latest_trade_date": dt1, "items": items}
+
     def _find_security(self, query: str) -> "_SecurityMeta | None":
         normalized = query.strip().upper()
         if not normalized:
@@ -181,7 +275,18 @@ class TianyanClient:
         sql = _compact_sql(sql)
         try:
             completed = subprocess.run(
-                [self._opencli, "tianyan", "sql", sql, "-f", "json"],
+                [
+                    self._opencli,
+                    "tianyan",
+                    "sql",
+                    sql,
+                    "-f",
+                    "json",
+                    "--site-session",
+                    "persistent",
+                    "--keep-tab",
+                    "true",
+                ],
                 check=False,
                 capture_output=True,
                 text=True,

@@ -38,6 +38,22 @@
       </div>
     </section>
     <section id="chart" class="chart" aria-label="K线图"></section>
+    <section id="concept-moneyflow" class="concept-moneyflow" aria-label="相关概念资金流">
+      <header class="moneyflow-header">
+        <div>
+          <strong>相关概念资金流</strong>
+          <span id="moneyflow-date" class="muted"></span>
+        </div>
+        <div class="moneyflow-tabs" aria-label="资金流时间区间">
+          <button class="moneyflow-tab" type="button" data-window="1">今日</button>
+          <button class="moneyflow-tab" type="button" data-window="5">5日</button>
+          <button class="moneyflow-tab active" type="button" data-window="20">20日</button>
+        </div>
+      </header>
+      <div id="moneyflow-list" class="moneyflow-list">
+        <div class="empty">选择股票后显示相关概念资金流。</div>
+      </div>
+    </section>
   </main>
 
   <aside class="info-panel">

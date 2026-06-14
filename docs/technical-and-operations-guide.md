@@ -28,9 +28,11 @@ flowchart LR
   Browser["浏览器 UI"] --> FastAPI["FastAPI 应用"]
   FastAPI --> Watchlist["WatchlistService"]
   FastAPI --> Market["MarketService"]
+  FastAPI --> Moneyflow["MoneyflowService"]
   FastAPI --> Announcement["AnnouncementService"]
   FastAPI --> Admin["AdminService"]
   Market --> Tianyan["TianyanClient / MockTianyanClient"]
+  Moneyflow --> Tianyan
   Watchlist --> Tianyan
   Announcement --> Tianyan
   Watchlist --> SQLite["SQLite"]
@@ -106,6 +108,7 @@ work/                  测试数据库、日志、临时文件，已被 .gitigno
 
 - `WatchlistService`：添加、查询、删除自选股。
 - `MarketService`：从天研日线生成日/周/月 K 线，支持未复权与前复权，附带 MA、MACD、价格涨跌幅、成交量环比，并把日线备份到 `market_bars`。
+- `MoneyflowService`：查询当前股票关联概念，过滤融资融券、地域、沪深股通等非业务概念，并聚合概念板块今日、5 日、20 日净资金流。当前版本实时查询天研，接口形状已为后续 SQLite 快照缓存预留。
 - `AnnouncementService`：拉取自选股公告、分类、去重、列表查询、详情查询和本地摘要生成。
 - `AdminService`：数据源状态、SQLite 表浏览、手动刷新、同名任务保护。
 
@@ -201,7 +204,32 @@ Invoke-RestMethod "http://127.0.0.1:8000/api/market/300502.SZ/kline?start=2026-0
 - `days`：查询时间范围，默认 `30`，最大 `365`。
 - `limit`：默认 `50`，范围 `1..200`。
 
-### 4.5 管理端
+### 4.5 概念资金流
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/moneyflow/{secucode}/concepts` | 查询当前股票相关概念板块资金流 |
+
+参数：
+
+- `sort_window`：排序窗口，支持 `1`、`5`、`20`，默认 `20`。
+- `limit`：返回概念数量，默认 `12`，范围 `1..30`。
+
+返回字段：
+
+- `latest_trade_date`：资金流数据最新交易日。
+- `items[].concept_name`：概念名称。
+- `items[].class_name` / `items[].subclass_name`：概念分类。
+- `items[].flow_1d` / `flow_5d` / `flow_20d`：净主动流入金额，单位为万元。
+- `items[].stock_count`：该概念下有资金流记录的成分股数量。
+
+当前实现：
+
+- 概念归属来自 `jydb.lc_coconcept` 与 `jydb.lc_conceptlist`。
+- 资金流来自 `wind_admin.ASHAREMONEYFLOW.S_MFD_INFLOW`。
+- 后端实时查询天研；后续需要优化查询性能与历史回看时，可增加 `concept_moneyflow_snapshots` 本地表，再让服务层优先读快照、缺失时回源天研。
+
+### 4.6 管理端
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
@@ -228,7 +256,7 @@ Invoke-RestMethod "http://127.0.0.1:8000/api/market/300502.SZ/kline?start=2026-0
 页面布局：
 
 - 左侧：品牌、添加股票、自选列表和删除按钮。
-- 中间：K 线图、成交量图、前复权切换与周期切换。
+- 中间：K 线图、成交量图、前复权切换、周期切换和相关概念资金流。
 - 右侧：公告时间标签、摘要、详情与数据源状态切换。
 
 操作入口：
@@ -236,7 +264,7 @@ Invoke-RestMethod "http://127.0.0.1:8000/api/market/300502.SZ/kline?start=2026-0
 1. 启动后打开 `http://127.0.0.1:8000`。
 2. 输入 `600519` 或 `贵州茅台`。
 3. 点击股票行。
-4. 中间显示 K 线图，右侧显示公告；点击“前复权”可切换复权绘图。
+4. 中间显示 K 线图、成交量图和相关概念资金流；点击“前复权”可切换复权绘图。
 5. 点击公告可查看摘要、可用正文和原始链接。
 6. 点击“同步公告”可同步当前股票公告；点击“数据源”查看管理端数据源状态。
 

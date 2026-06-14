@@ -16,6 +16,7 @@ class MockTianyanClient:
             Security(secucode="300750.SZ", secuname="\u5b81\u5fb7\u65f6\u4ee3"),
             Security(secucode="000001.SZ", secuname="\u5e73\u5b89\u94f6\u884c"),
             Security(secucode="301511.SZ", secuname="\u5fb7\u798f\u79d1\u6280"),
+            Security(secucode="300502.SZ", secuname="\u65b0\u6613\u76db"),
         ]
         self._announcements = {
             "600519.SH": [
@@ -106,6 +107,66 @@ class MockTianyanClient:
             for announcement in self._announcements.get(secucode, [])
             if announcement["publish_date"] > since_date
         ]
+
+    def get_stock_concepts(self, secucode: str) -> list[dict]:
+        if secucode != "300502.SZ":
+            return [
+                {
+                    "concept_code": 11100011,
+                    "concept_name": "\u82af\u7247\u6982\u5ff5",
+                    "class_name": "\u79d1\u6280",
+                    "subclass_name": "\u5236\u90202025",
+                }
+            ]
+        return [
+            {
+                "concept_code": 11062211,
+                "concept_name": "\u5171\u5c01\u88c5\u5149\u6a21\u5757(CPO\uff09",
+                "class_name": "\u79d1\u6280",
+                "subclass_name": "\u65b0\u79d1\u6280",
+            },
+            {
+                "concept_code": 11102190,
+                "concept_name": "\u5149\u901a\u4fe1",
+                "class_name": "\u79d1\u6280",
+                "subclass_name": "\u5236\u90202025",
+            },
+            {
+                "concept_code": 15030008,
+                "concept_name": "\u878d\u8d44\u878d\u5238",
+                "class_name": "\u5176\u4ed6",
+                "subclass_name": "\u7279\u6b8a\u80a1\u7968",
+            },
+        ]
+
+    def get_concept_moneyflow(self, concept_codes: list[int]) -> dict:
+        rows = {
+            11062211: {
+                "concept_code": 11062211,
+                "flow_1d": -860082.2174,
+                "flow_5d": -2648311.1115,
+                "flow_20d": 134566.1383,
+                "stock_count": 175,
+            },
+            11102190: {
+                "concept_code": 11102190,
+                "flow_1d": 12000,
+                "flow_5d": 23000,
+                "flow_20d": 230000,
+                "stock_count": 83,
+            },
+            11100011: {
+                "concept_code": 11100011,
+                "flow_1d": 21000,
+                "flow_5d": -11000,
+                "flow_20d": 32000,
+                "stock_count": 128,
+            },
+        }
+        return {
+            "latest_trade_date": "20260612",
+            "items": [rows[code] for code in concept_codes if code in rows],
+        }
 
 
 def _coerce_date(value: date | datetime | str) -> date:

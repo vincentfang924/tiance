@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from tiance.api import admin, announcements, market, watchlist
+from tiance.api import admin, announcements, market, moneyflow, watchlist
 from tiance.clients.tianyan import create_tianyan_client
 from tiance.config import default_settings
 from tiance.db.migrations import migrate
@@ -14,6 +14,7 @@ from tiance.scheduler.runtime import create_scheduler
 from tiance.services.admin import AdminService
 from tiance.services.announcement import AnnouncementService
 from tiance.services.market import MarketService
+from tiance.services.moneyflow import MoneyflowService
 from tiance.services.watchlist import WatchlistService
 
 
@@ -48,6 +49,7 @@ def create_app(testing: bool = False) -> FastAPI:
         app.state.tianyan_client,
     )
     app.state.market_service = MarketService(app.state.tianyan_client, db_path=settings.db_path)
+    app.state.moneyflow_service = MoneyflowService(app.state.tianyan_client)
     app.state.announcement_service = AnnouncementService(
         settings.db_path,
         app.state.tianyan_client,
@@ -61,6 +63,7 @@ def create_app(testing: bool = False) -> FastAPI:
 
     app.include_router(watchlist.router)
     app.include_router(market.router)
+    app.include_router(moneyflow.router)
     app.include_router(admin.router)
     app.include_router(announcements.router)
     app.mount(

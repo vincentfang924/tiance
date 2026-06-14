@@ -3,6 +3,7 @@ let selectedRow = null;
 let activePanel = "announcements";
 let announcementDays = 30;
 let adjustMode = "none";
+let moneyflowWindow = 20;
 
 const chartElement = document.getElementById("chart");
 const chart = echarts.init(chartElement);
@@ -30,6 +31,20 @@ function formatPct(value) {
   const number = Number(value);
   const sign = number > 0 ? "+" : "";
   return `${sign}${number.toFixed(2)}%`;
+}
+
+function formatFlowYi(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "-";
+  const number = Number(value) / 10000;
+  const sign = number > 0 ? "+" : "";
+  return `${sign}${number.toFixed(2)}亿`;
+}
+
+function flowClass(value) {
+  const number = Number(value || 0);
+  if (number > 0) return "flow-positive";
+  if (number < 0) return "flow-negative";
+  return "";
 }
 
 async function api(path, options = {}) {
@@ -102,11 +117,13 @@ async function removeStock(secucode) {
     document.getElementById("adjust-forward").disabled = true;
     document.getElementById("info-content").innerHTML = '<div class="empty">选择股票后显示公告。</div>';
     document.getElementById("announcement-detail").innerHTML = "";
+    renderConceptMoneyflow(null);
   }
   await loadWatchlist();
 }
 
 async function selectStock(row) {
+  setStatus("");
   selectedCode = row.secucode;
   selectedRow = row;
   document.getElementById("selected-title").textContent = `${row.secuname} ${row.secucode}`;
@@ -115,6 +132,7 @@ async function selectStock(row) {
   document.getElementById("adjust-forward").disabled = false;
   await loadWatchlist();
   await loadKline();
+  await loadConceptMoneyflow();
   await loadActivePanel();
 }
 
@@ -264,6 +282,64 @@ async function loadAnnouncements() {
   });
 }
 
+function renderConceptMoneyflow(data) {
+  const box = document.getElementById("moneyflow-list");
+  const date = document.getElementById("moneyflow-date");
+  document.querySelectorAll(".moneyflow-tab").forEach((button) => {
+    button.classList.toggle("active", Number(button.dataset.window) === moneyflowWindow);
+  });
+
+  if (!data) {
+    date.textContent = "";
+    box.innerHTML = '<div class="empty">选择股票后显示相关概念资金流。</div>';
+    return;
+  }
+
+  date.textContent = data.latest_trade_date ? `更新 ${data.latest_trade_date}` : "";
+  if (!data.items?.length) {
+    box.innerHTML = '<div class="empty">暂无相关概念资金流。</div>';
+    return;
+  }
+
+  box.innerHTML = data.items.map((row) => `
+    <div class="moneyflow-row">
+      <div class="moneyflow-title">
+        <strong>${escapeHtml(row.concept_name)}</strong>
+        <span class="muted">${escapeHtml(row.class_name || "-")} · ${escapeHtml(row.subclass_name || "-")}</span>
+      </div>
+      <div class="flow-cell">
+        <span>今日</span>
+        <strong class="${flowClass(row.flow_1d)}">${formatFlowYi(row.flow_1d)}</strong>
+      </div>
+      <div class="flow-cell">
+        <span>5日</span>
+        <strong class="${flowClass(row.flow_5d)}">${formatFlowYi(row.flow_5d)}</strong>
+      </div>
+      <div class="flow-cell">
+        <span>20日</span>
+        <strong class="${flowClass(row.flow_20d)}">${formatFlowYi(row.flow_20d)}</strong>
+      </div>
+      <div class="flow-cell">
+        <span>成分股</span>
+        <strong>${formatNumber(row.stock_count)}</strong>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function loadConceptMoneyflow() {
+  if (!selectedCode) {
+    renderConceptMoneyflow(null);
+    return;
+  }
+  const params = new URLSearchParams({
+    sort_window: String(moneyflowWindow),
+    limit: "12",
+  });
+  const data = await api(`/api/moneyflow/${selectedCode}/concepts?${params.toString()}`);
+  renderConceptMoneyflow(data);
+}
+
 async function openAnnouncement(annId) {
   if (!selectedCode || !annId) return;
   const row = await api(`/api/announcements/${selectedCode}/${encodeURIComponent(annId)}`);
@@ -352,6 +428,12 @@ document.querySelectorAll(".range-tab").forEach((button) => {
     announcementDays = Number(button.dataset.days);
     document.querySelectorAll(".range-tab").forEach((item) => item.classList.toggle("active", item === button));
     withStatus(loadAnnouncements);
+  });
+});
+document.querySelectorAll(".moneyflow-tab").forEach((button) => {
+  button.addEventListener("click", () => {
+    moneyflowWindow = Number(button.dataset.window);
+    withStatus(loadConceptMoneyflow);
   });
 });
 window.addEventListener("resize", () => chart.resize());

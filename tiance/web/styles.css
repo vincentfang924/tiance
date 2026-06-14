@@ -157,7 +157,7 @@ button {
   min-width: 0;
   padding: 16px;
   display: grid;
-  grid-template-rows: 44px minmax(420px, 1fr);
+  grid-template-rows: 44px minmax(420px, 1fr) auto;
   gap: 12px;
 }
 
@@ -190,6 +190,88 @@ button:disabled {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+.concept-moneyflow {
+  min-height: 168px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.moneyflow-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.moneyflow-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.moneyflow-tab {
+  height: 30px;
+  padding: 0 10px;
+  background: var(--panel-strong);
+  font-size: 12px;
+}
+
+.moneyflow-tab.active {
+  background: var(--primary-soft);
+  border-color: #7ab7e0;
+  color: var(--primary);
+}
+
+.moneyflow-list {
+  display: grid;
+  gap: 8px;
+}
+
+.moneyflow-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.4fr) repeat(3, minmax(100px, 0.8fr)) 76px;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 8px 10px;
+  border: 1px solid #edf1f5;
+  border-radius: 6px;
+  background: var(--panel-strong);
+}
+
+.moneyflow-title {
+  min-width: 0;
+}
+
+.moneyflow-title strong,
+.moneyflow-title span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flow-cell {
+  display: grid;
+  gap: 2px;
+  text-align: right;
+}
+
+.flow-cell span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.flow-positive {
+  color: #b42318;
+}
+
+.flow-negative {
+  color: #21855b;
 }
 
 .tabs {
@@ -307,6 +389,20 @@ button:disabled {
   }
 
   .workspace {
-    grid-template-rows: auto minmax(420px, 60vh);
+    grid-template-rows: auto minmax(420px, 60vh) auto;
+  }
+
+  .moneyflow-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .moneyflow-row {
+    grid-template-columns: 1fr;
+  }
+
+  .flow-cell {
+    grid-template-columns: 52px 1fr;
+    text-align: left;
   }
 }

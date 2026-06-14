@@ -55,7 +55,13 @@ def test_list_securities_returns_list_copy():
     first_result.clear()
 
     remaining_codes = {item.secucode for item in client.list_securities()}
-    assert remaining_codes == {"600519.SH", "300750.SZ", "000001.SZ", "301511.SZ"}
+    assert remaining_codes == {
+        "600519.SH",
+        "300750.SZ",
+        "000001.SZ",
+        "301511.SZ",
+        "300502.SZ",
+    }
 
 
 def test_get_daily_kline_returns_ohlcv_rows_for_weekdays():

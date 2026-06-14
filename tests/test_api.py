@@ -195,6 +195,19 @@ def test_get_market_kline_rejects_invalid_adjust_mode():
     assert response.json()["error"]["code"] == "INVALID_ADJUST_MODE"
 
 
+def test_get_concept_moneyflow_returns_related_concepts():
+    with TestClient(create_app(testing=True)) as client:
+        response = client.get("/api/moneyflow/300502.SZ/concepts", params={"sort_window": 20})
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["secucode"] == "300502.SZ"
+    assert data["sort_window"] == 20
+    assert data["latest_trade_date"]
+    assert data["items"]
+    assert {"concept_name", "flow_1d", "flow_5d", "flow_20d", "stock_count"} <= set(data["items"][0])
+
+
 def test_blank_watchlist_query_returns_wrapped_validation_error():
     with TestClient(create_app(testing=True)) as client:
         response = client.post("/api/watchlist", json={"query": ""})
@@ -391,6 +404,7 @@ def test_web_root_serves_browser_workspace():
     assert "天策" in response.text
     assert 'id="watchlist"' in response.text
     assert 'id="chart"' in response.text
+    assert 'id="concept-moneyflow"' in response.text
     assert 'id="adjust-forward"' in response.text
     assert 'id="sync-announcements"' in response.text
     assert 'id="announcement-range"' in response.text
@@ -407,5 +421,6 @@ def test_web_assets_are_served():
     assert js_response.status_code == 200
     assert "loadWatchlist" in js_response.text
     assert "removeStock" in js_response.text
+    assert "loadConceptMoneyflow" in js_response.text
     assert "axisPointer" in js_response.text
     assert "link" in js_response.text
